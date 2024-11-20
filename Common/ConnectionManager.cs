@@ -1,4 +1,4 @@
-﻿using MySqlConnector;
+using MySqlConnector;
 using Sample.Models.DAO;
 
 namespace Sample.Common
@@ -66,9 +66,17 @@ namespace Sample.Common
 
                 // 비관리 리소스 해제
                 masterDB?.Dispose();
-                for (int i = 0; i < shardDB?.Length; i++)
+                masterDB = null;
+
+                if (shardDB != null)
                 {
-                    shardDB[i]?.Dispose();
+                    for (int i = 0; i < shardDB.Length; i++)
+                    {
+                        shardDB[i]?.Dispose();
+                        shardDB[i] = null;
+                    }
+
+                    shardDB = null;
                 }
 
                 disposed = true;
@@ -78,19 +86,23 @@ namespace Sample.Common
         public async Task CloseAll()
         {
             if (masterDB != null)
-                await Close(masterDB);
-
-            masterDB = null;
-
-            for (int i = 0; i < shardDB?.Length; i++)
             {
-                if (shardDB[i] != null)
-                    await Close(shardDB[i]);
-
-                shardDB[i] = null;
+                await Close(masterDB);
+                masterDB = null;
             }
 
-            shardDB = null;
+            if (shardDB != null)
+            {
+                for (int i = 0; i < shardDB.Length; i++)
+                {
+                    if (shardDB[i] != null)
+                        await Close(shardDB[i]);
+
+                    shardDB[i] = null;
+                }
+
+                shardDB = null;
+            }
         }
 
         public async Task Close(MySqlConnection? connection)
@@ -112,7 +124,7 @@ namespace Sample.Common
             if (masterDB == null)
                 masterDB = new MySqlConnection("임시");
 
-            if (!await masterDB.PingAsync().ConfigureAwait(false))
+            if (masterDB.State == System.Data.ConnectionState.Closed)
             {
                 try
                 {
@@ -137,7 +149,7 @@ namespace Sample.Common
             if (shardDB[shardIdx] == null)
                 shardDB[shardIdx] = new MySqlConnection("임시");
 
-            if (!await shardDB[shardIdx].PingAsync().ConfigureAwait(false))
+            if (shardDB[shardIdx].State == System.Data.ConnectionState.Closed)
             {
                 try
                 {
